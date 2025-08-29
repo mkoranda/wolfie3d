@@ -85,6 +85,10 @@ player_x = 3.5
 player_y = 10.5
 dir_x, dir_y = 1.0, 0.0
 plane_x, plane_y = 0.0, PLANE_LEN
+# Player ammo - limited resource that decreases when shooting
+# The ammo count is displayed as a colored bar next to the weapon
+# Green: > 10 ammo, Yellow: 6-10 ammo, Red: <= 5 ammo
+player_ammo = 20  # Starting ammo count
 
 # ---------- Hjelpere ----------
 def in_map(ix: int, iy: int) -> bool:
@@ -397,7 +401,7 @@ class GLRenderer:
             here.parent / "assets" / "textures",
             here.parent.parent / "assets" / "textures",
             Path.cwd() / "assets" / "textures",
-        ]
+            ]
         print("\n[GLRenderer] Prøver å finne assets/textures på disse stedene:")
         for c in candidates:
             print("  -", c)
@@ -782,6 +786,9 @@ def build_crosshair_quads(size_px: int = 8, thickness_px: int = 2) -> np.ndarray
 
 def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     """En enkel "pistolboks" nederst (farget quad), m/ liten recoil-bevegelse."""
+    verts = []
+
+    # Weapon box
     base_w, base_h = 200, 120
     x = HALF_W - base_w // 2
     y = HEIGHT - base_h - 10
@@ -797,7 +804,7 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     # vi bruker v_col for RGB, alpha kommer fra tekstur (1x1 hvit, a=1). For alpha: n.a. her.
     r, g, b = (0.12, 0.12, 0.12)
     depth = 0.0
-    verts = [
+    verts.extend([
         x0, y0, 0.0, 0.0, r, g, b, depth,
         x0, y1, 0.0, 1.0, r, g, b, depth,
         x1, y0, 1.0, 0.0, r, g, b, depth,
@@ -805,8 +812,52 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
         x1, y0, 1.0, 0.0, r, g, b, depth,
         x0, y1, 0.0, 1.0, r, g, b, depth,
         x1, y1, 1.0, 1.0, r, g, b, depth,
-    ]
+    ])
+
+    # Ammo counter - a full bar that changes color and shrinks as ammo depletes
+    # Instead of showing just a partial bar, we'll show a full green bar that:
+    # 1. Starts as full height and green when ammo is full
+    # 2. Shrinks proportionally as ammo is used
+    # 3. Changes color from green to yellow to red as ammo decreases
+    ammo_w = 20
+    ammo_h = base_h
+    ammo_x = x - ammo_w - 10  # 10px gap from weapon
+    ammo_y = y
+
+    # Calculate the height of the ammo bar based on remaining ammo
+    # Full height when ammo is at maximum (20)
+    ammo_h_scaled = ammo_h * (player_ammo / 20)  # Assuming max ammo is 20
+    ammo_y_offset = ammo_h - ammo_h_scaled
+
+    # Convert to NDC coordinates
+    ax0 = (2.0 * ammo_x) / WIDTH - 1.0
+    ax1 = (2.0 * (ammo_x + ammo_w)) / WIDTH - 1.0
+    ay0 = 1.0 - 2.0 * ((ammo_y + ammo_y_offset) / HEIGHT)
+    ay1 = 1.0 - 2.0 * (ammo_y / HEIGHT)
+
+    # Color gradient based on ammo percentage:
+    # - Green (0,1,0) when full (>10)
+    # - Yellow (1,1,0) when medium (6-10)
+    # - Red (1,0,0) when low (≤5)
+    if player_ammo > 10:
+        ar, ag, ab = 0.0, 1.0, 0.0  # Green
+    elif player_ammo > 5:
+        ar, ag, ab = 1.0, 1.0, 0.0  # Yellow
+    else:
+        ar, ag, ab = 1.0, 0.0, 0.0  # Red
+
+    verts.extend([
+        ax0, ay0, 0.0, 0.0, ar, ag, ab, depth,
+        ax0, ay1, 0.0, 1.0, ar, ag, ab, depth,
+        ax1, ay0, 1.0, 0.0, ar, ag, ab, depth,
+
+        ax1, ay0, 1.0, 0.0, ar, ag, ab, depth,
+        ax0, ay1, 0.0, 1.0, ar, ag, ab, depth,
+        ax1, ay1, 1.0, 1.0, ar, ag, ab, depth,
+    ])
+
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
+
 
 def build_minimap_quads() -> np.ndarray:
     """Liten GL-basert minimap øverst til venstre."""
@@ -905,6 +956,7 @@ def handle_input(dt: float) -> None:
 
 # ---------- Main ----------
 def main() -> None:
+    global player_ammo
     pygame.init()
     pygame.display.set_caption("Vibe Wolf (OpenGL)")
 
@@ -949,6 +1001,22 @@ def main() -> None:
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 if event.key == pygame.K_SPACE:
+                    # Only shoot if player has ammo
+                    if player_ammo > 0:
+                        bx = player_x + dir_x * 0.4
+                        by = player_y + dir_y * 0.4
+                        bvx = dir_x * 10.0
+                        bvy = dir_y * 10.0
+                        bullets.append(Bullet(bx, by, bvx, bvy))
+                        firing = True
+                        recoil_t = 0.0
+                        # Decrease ammo when shooting
+                        player_ammo -= 1
+                    # If no ammo, the player can't shoot (silent failure)
+                    # Could add sound effect or visual feedback here
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # Only shoot if player has ammo
+                if player_ammo > 0:
                     bx = player_x + dir_x * 0.4
                     by = player_y + dir_y * 0.4
                     bvx = dir_x * 10.0
@@ -956,14 +1024,10 @@ def main() -> None:
                     bullets.append(Bullet(bx, by, bvx, bvy))
                     firing = True
                     recoil_t = 0.0
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                bx = player_x + dir_x * 0.4
-                by = player_y + dir_y * 0.4
-                bvx = dir_x * 10.0
-                bvy = dir_y * 10.0
-                bullets.append(Bullet(bx, by, bvx, bvy))
-                firing = True
-                recoil_t = 0.0
+                    # Decrease ammo when shooting
+                    player_ammo -= 1
+                # If no ammo, the player can't shoot (silent failure)
+                # Could add sound effect or visual feedback here
 
         handle_input(dt)
 

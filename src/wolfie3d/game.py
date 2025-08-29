@@ -1020,7 +1020,7 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
 
 
-def build_minimap_quads(ammo_boxes: list['AmmoBox'] = None) -> np.ndarray:
+def build_minimap_quads(ammo_boxes: list['AmmoBox'] = None, enemies: list['Enemy'] = None) -> np.ndarray:
     """Liten GL-basert minimap øverst til venstre."""
     scale = 6
     mm_w = MAP_W * scale
@@ -1031,6 +1031,10 @@ def build_minimap_quads(ammo_boxes: list['AmmoBox'] = None) -> np.ndarray:
     # If ammo_boxes is None, use an empty list
     if ammo_boxes is None:
         ammo_boxes = []
+
+    # If enemies is None, use an empty list
+    if enemies is None:
+        enemies = []
 
     def add_quad_px(x_px, y_px, w_px, h_px, col, depth):
         r, g, b = col
@@ -1077,6 +1081,15 @@ def build_minimap_quads(ammo_boxes: list['AmmoBox'] = None) -> np.ndarray:
             box_y = int(box.y * scale)
             # Draw a green square for each ammo box
             add_quad_px(pad + box_x - 2, pad + box_y - 2, 4, 4, (0.2, 0.8, 0.2), 0.0)
+
+    # Draw enemies on minimap
+    for enemy in enemies:
+        if enemy.alive:
+            # Convert enemy position to minimap coordinates
+            enemy_x = int(enemy.x * scale)
+            enemy_y = int(enemy.y * scale)
+            # Draw a red square for each enemy
+            add_quad_px(pad + enemy_x - 2, pad + enemy_y - 2, 4, 4, (0.9, 0.1, 0.1), 0.0)
 
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
 
@@ -1314,7 +1327,7 @@ def main() -> None:
         renderer.draw_arrays(overlay, renderer.white_tex, use_tex=False)
 
         # Minimap
-        mm = build_minimap_quads(ammo_boxes)
+        mm = build_minimap_quads(ammo_boxes, enemies)
         renderer.draw_arrays(mm, renderer.white_tex, use_tex=False)
 
         pygame.display.flip()

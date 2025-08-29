@@ -1,38 +1,57 @@
-:joystick: Oppgavebank – Vibe Wolf 3D
- Alle starter med samme repo (koden dere har nå).
- Plukk oppgaver dere synes er morsomme – målet er å eksperimentere og “vibe-kode”.
- Flere grupper kan gjøre samme oppgave – vi samler kode etterpå.
-:dart: Core Gameplay
- Fiende HP: Fienden tåler flere skudd (f.eks. 3) før den dør.
- Spiller HP: Spilleren har helse. Når en fiende kommer nær, tar du skade.
- Game Over: Vis en enkel “Game Over”-melding når spilleren dør.
- Score: +100 poeng per fiende drept. Vis scoren på skjermen.
-:gun: Våpen & ammo
- Ammo-teller: Legg til ammo. Når du går tom, kan du ikke skyte.
- Reload: Trykk R for å fylle opp ammo igjen.
- Pickup-objekt: Lag et “ammo-box”-sprite på gulvet som kan plukkes opp.
-:japanese_ogre: Fiender
- Flere fiender: Legg inn flere fiender på kartet.
- Forskjellige fiender: To typer med ulik fart eller HP.
- Fiende-animasjon: Bytt mellom to sprites for å få en enkel gå-animasjon.
- Dødsanimasjon: Når fienden dør, vis en annen sprite i et kort øyeblikk.
-:checkered_flag: Checkpoints & mål
- Checkpoints: Legg til punkter i kartet spilleren må gå innom.
- Seier: Når alle fiender er drept eller alle checkpoints er tatt → vis “You win!”.
- Timer: Mål tiden fra start til seier.
- Highscore: Kombiner tid og score i en enkel “highscore”-beregning.
-:compass: Verden & interaksjon
- Dør/port: Lag en vegg som kan åpnes med en tast.
- Nøkkel: Legg til et nøkkelobjekt – nødvendig for å åpne døren.
- Secret room: Skjul et rom bak en vegg som kan åpnes.
- Pickup helse: Legg inn helsepakke som gir +50 HP.
-:art: Presentasjon
- Lys/fog: Vegger og fiender blir mørkere jo lenger unna de er.
- Mini-map forbedring: Vis fiender og checkpoints som små prikker.
- HUD: Vis HP, ammo og score med enkel overlay.
- Lyd: Legg på skuddlyd eller fiende-lyd (pygame.mixer).
-:rocket: Ekstra / Stretch Goals
- Granat/rocket: Skyt et prosjektil som gjør skade i radius.
- Flere våpen: Bytt mellom pistol og maskingevær.
- Multiplayer-lite: Synk posisjon til to spillere over nettverk (enkelt UDP).
- Level-loader: Les kartet fra en .json- eller .txt-fil i stedet for hardkodet MAP.
+# 🕹️ Oppgavebank – Vibe Wolf 3D
+
+Velkommen til fagdagen!  
+Alle starter med samme utgangspunkt (denne koden).  
+Målet er å **vibe-kode** og teste ut små og store features.  
+Plukk de oppgavene dere synes er morsomme – flere grupper kan gjøre samme oppgave.  
+Til slutt samler vi alt og setter det sammen til en demo for JavaZone 🚀
+
+---
+
+## 🎯 Core Gameplay
+- [ ] 👹 **Fiende HP:** Fienden tåler flere skudd (f.eks. 3) før den dør  
+- [ ] ❤️ **Spiller HP:** Spilleren tar skade når fiender kommer nær  
+- [ ] 💀 **Game Over:** Vis en melding når spilleren dør  
+- [ ] 🏆 **Score:** +100 poeng per fiende drept, vis på skjermen  
+
+## 🔫 Våpen & ammo
+- [ ] 🔢 **Ammo-teller:** Spilleren har begrenset ammo  
+- [ ] 🔄 **Reload:** Trykk `R` for å lade om  
+- [ ] 📦 **Pickup-objekt:** Lag et ammo-box på gulvet som kan plukkes opp  
+
+## 👹 Fiender
+- [ ] 👥 **Flere fiender:** Legg inn flere i kartet  
+- [ ] 🎭 **Forskjellige fiender:** Ulike HP/fart  
+- [ ] 🕺 **Fiende-animasjon:** Bytt mellom sprites for å gi liv  
+- [ ] ⚰️ **Dødsanimasjon:** Egen sprite når fienden dør  
+
+## 🏁 Checkpoints & mål
+- [ ] 📍 **Checkpoints:** Spilleren må innom punkter i kartet  
+- [ ] 🎉 **Seier:** Når alle fiender er drept eller alle punkter er tatt  
+- [ ] ⏱️ **Timer:** Mål tid fra start til seier  
+- [ ] 🏅 **Highscore:** Kombiner tid og score  
+
+## 🧭 Verden & interaksjon
+- [ ] 🚪 **Dør/port:** Lag en vegg som kan åpnes med tast  
+- [ ] 🔑 **Nøkkel:** Kreves for å åpne døren  
+- [ ] 🕳️ **Secret room:** Skjult rom bak vegg  
+- [ ] 🩹 **Pickup helse:** Helsepakke gir +50 HP  
+
+## 🎨 Presentasjon
+- [ ] 🌫️ **Fog:** Vegger/fiender blir mørkere med avstand  
+- [ ] 🗺️ **Mini-map forbedring:** Vis fiender og punkter som prikker  
+- [ ] 📊 **HUD:** Vis HP, ammo og score  
+- [ ] 🔊 **Lyd:** Legg på skudd-/fiendelyd  
+
+## 🚀 Ekstra / Stretch Goals
+- [ ] 💥 **Granat:** Prosjektil som gjør AOE-skade  
+- [ ] 🔫 **Flere våpen:** Bytt mellom pistol og rifle  
+- [ ] 🌐 **Multiplayer-lite:** To spillere i samme map (enkelt UDP)  
+- [ ] 🗂️ **Level-loader:** Les MAP fra fil i stedet for hardkodet  
+
+---
+
+👉 Tips:  
+- Det er helt OK om flere grupper gjør samme oppgave  
+- Små forbedringer er like verdifulle som store features  
+- Kommentér hva dere har gjort i koden – da blir det lettere å sy sammen etterpå  

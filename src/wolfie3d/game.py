@@ -179,6 +179,45 @@ plane_x, plane_y = 0.0, PLANE_LEN
 # Green: > 10 ammo, Yellow: 6-10 ammo, Red: <= 5 ammo
 player_ammo = 20  # Starting ammo count
 
+# ---------- Weapon System ----------
+class Weapon:
+    def __init__(self, name: str, fire_rate: float, bullet_speed: float, damage: int, max_ammo: int, color: tuple[float, float, float]) -> None:
+        self.name = name
+        self.fire_rate = fire_rate  # shots per second
+        self.bullet_speed = bullet_speed
+        self.damage = damage
+        self.max_ammo = max_ammo
+        self.current_ammo = max_ammo
+        self.color = color  # RGB color for weapon display
+        self.last_shot_time = 0.0
+
+    def can_shoot(self, current_time: float) -> bool:
+        """Check if weapon can shoot based on fire rate and ammo"""
+        time_since_last_shot = current_time - self.last_shot_time
+        min_time_between_shots = 1.0 / self.fire_rate
+        return self.current_ammo > 0 and time_since_last_shot >= min_time_between_shots
+
+    def shoot(self, current_time: float) -> bool:
+        """Attempt to shoot, returns True if successful"""
+        if self.can_shoot(current_time):
+            self.current_ammo -= 1
+            self.last_shot_time = current_time
+            return True
+        return False
+
+    def reload(self) -> None:
+        """Reload weapon to full ammo"""
+        self.current_ammo = self.max_ammo
+
+# Initialize weapons
+weapons = {
+    1: Weapon("Pistol", 3.0, 10.0, 1, 20, (0.8, 0.8, 0.8)),  # 3 shots/sec, speed 10, damage 1, 20 ammo, light gray
+    2: Weapon("Rifle", 8.0, 15.0, 1, 30, (0.4, 0.2, 0.0)),   # 8 shots/sec, speed 15, damage 1, 30 ammo, brown
+}
+
+current_weapon_id = 1  # Start with pistol
+current_weapon = weapons[current_weapon_id]
+
 # ---------- Hjelpere ----------
 def in_map(ix: int, iy: int) -> bool:
     return 0 <= ix < MAP_W and 0 <= iy < MAP_H
@@ -368,10 +407,9 @@ class AmmoBox:
 
         # If player is close enough, reload ammo and mark as not alive
         if dist <= self.pickup_distance:
-            global player_ammo
-            player_ammo = 20  # Reload ammo to 100% (20 bullets)
+            current_weapon.reload()
             self.alive = False
-            print("Ammo reloaded to 100%!")
+            print(f"{current_weapon.name} reloaded to {current_weapon.max_ammo} bullets!")
             # Play ammo pickup sound
             play_sound("ammo_pickup")
 
@@ -1135,10 +1173,10 @@ def build_crosshair_quads(size_px: int = 8, thickness_px: int = 2) -> np.ndarray
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
 
 def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
-    """En enkel "pistolboks" nederst (farget quad), m/ liten recoil-bevegelse."""
+    """Weapon display with current weapon color and recoil animation."""
     verts = []
 
-    # Weapon box
+    # Weapon box - use current weapon color
     base_w, base_h = 200, 120
     x = HALF_W - base_w // 2
     y = HEIGHT - base_h - 10
@@ -1150,9 +1188,8 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     y0 = 1.0 - 2.0 * (y / HEIGHT)
     y1 = 1.0 - 2.0 * ((y + base_h) / HEIGHT)
 
-    # lett gjennomsiktig mørk grå
-    # vi bruker v_col for RGB, alpha kommer fra tekstur (1x1 hvit, a=1). For alpha: n.a. her.
-    r, g, b = (0.12, 0.12, 0.12)
+    # Use current weapon color
+    r, g, b = current_weapon.color
     depth = 0.0
     verts.extend([
         x0, y0, 0.0, 0.0, r, g, b, depth,
@@ -1165,18 +1202,16 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     ])
 
     # Ammo counter - a full bar that changes color and shrinks as ammo depletes
-    # Instead of showing just a partial bar, we'll show a full green bar that:
-    # 1. Starts as full height and green when ammo is full
-    # 2. Shrinks proportionally as ammo is used
-    # 3. Changes color from green to yellow to red as ammo decreases
+    # Uses current weapon's ammo and max ammo for proper scaling
     ammo_w = 20
     ammo_h = base_h
     ammo_x = x - ammo_w - 10  # 10px gap from weapon
     ammo_y = y
 
     # Calculate the height of the ammo bar based on remaining ammo
-    # Full height when ammo is at maximum (20)
-    ammo_h_scaled = ammo_h * (player_ammo / 20)  # Assuming max ammo is 20
+    # Full height when ammo is at maximum for current weapon
+    ammo_ratio = current_weapon.current_ammo / current_weapon.max_ammo if current_weapon.max_ammo > 0 else 0
+    ammo_h_scaled = ammo_h * ammo_ratio
     ammo_y_offset = ammo_h - ammo_h_scaled
 
     # Convert to NDC coordinates
@@ -1186,12 +1221,12 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     ay1 = 1.0 - 2.0 * (ammo_y / HEIGHT)
 
     # Color gradient based on ammo percentage:
-    # - Green (0,1,0) when full (>10)
-    # - Yellow (1,1,0) when medium (6-10)
-    # - Red (1,0,0) when low (≤5)
-    if player_ammo > 10:
+    # - Green when >50% ammo
+    # - Yellow when 25-50% ammo
+    # - Red when <25% ammo
+    if ammo_ratio > 0.5:
         ar, ag, ab = 0.0, 1.0, 0.0  # Green
-    elif player_ammo > 5:
+    elif ammo_ratio > 0.25:
         ar, ag, ab = 1.0, 1.0, 0.0  # Yellow
     else:
         ar, ag, ab = 1.0, 0.0, 0.0  # Red
@@ -1415,7 +1450,7 @@ def find_random_valid_position() -> tuple[float, float]:
                 return x, y
 
 def main() -> None:
-    global player_ammo
+    global player_ammo, current_weapon, current_weapon_id
     pygame.init()
 
     # Initialize audio system
@@ -1474,39 +1509,46 @@ def main() -> None:
                     print("Mouse grab:", grab)
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                # Weapon switching with number keys
+                if event.key == pygame.K_1:
+                    current_weapon_id = 1
+                    current_weapon = weapons[current_weapon_id]
+                    print(f"Switched to {current_weapon.name}")
+                elif event.key == pygame.K_2:
+                    current_weapon_id = 2
+                    current_weapon = weapons[current_weapon_id]
+                    print(f"Switched to {current_weapon.name}")
                 if event.key == pygame.K_SPACE:
-                    # Only shoot if player has ammo
-                    if player_ammo > 0:
+                    # Use current weapon to shoot
+                    current_time = time.time()
+                    if current_weapon.shoot(current_time):
                         bx = player_x + dir_x * 0.4
                         by = player_y + dir_y * 0.4
-                        bvx = dir_x * 10.0
-                        bvy = dir_y * 10.0
+                        bvx = dir_x * current_weapon.bullet_speed
+                        bvy = dir_y * current_weapon.bullet_speed
                         bullets.append(Bullet(bx, by, bvx, bvy))
                         firing = True
                         recoil_t = 0.0
-                        # Decrease ammo when shooting
-                        player_ammo -= 1
                         # Play gunshot sound
                         play_sound("gunshot")
                     else:
-                        # Play empty click sound when out of ammo
+                        # Play empty click sound when out of ammo or firing too fast
                         play_sound("empty_click")
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                # Only shoot if player has ammo
-                if player_ammo > 0:
+                # Use current weapon to shoot
+                current_time = time.time()
+                if current_weapon.shoot(current_time):
                     bx = player_x + dir_x * 0.4
                     by = player_y + dir_y * 0.4
-                    bvx = dir_x * 10.0
-                    bvy = dir_y * 10.0
+                    bvx = dir_x * current_weapon.bullet_speed
+                    bvy = dir_y * current_weapon.bullet_speed
                     bullets.append(Bullet(bx, by, bvx, bvy))
                     firing = True
                     recoil_t = 0.0
-                    # Decrease ammo when shooting
-                    player_ammo -= 1
                     # Play gunshot sound
                     play_sound("gunshot")
                 else:
-                    # Play empty click sound when out of ammo
+                    # Play empty click sound when out of ammo or firing too fast
                     play_sound("empty_click")
 
         handle_input(dt)

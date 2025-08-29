@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pygame
 from OpenGL import GL as gl
+from pathlib import Path
 
 if TYPE_CHECKING:  # kun for typing hints
     from collections.abc import Sequence
@@ -55,6 +56,92 @@ TEX_W = TEX_H = 256
 
 # Depth mapping (lineær til [0..1] for gl_FragDepth)
 FAR_PLANE = 100.0
+
+# ---------- Audio System ----------
+MUSIC_VOLUME = 0.7  # Background music volume (0.0 to 1.0)
+SOUND_VOLUME = 0.8  # Sound effects volume (0.0 to 1.0)
+
+def init_audio() -> None:
+    """Initialize pygame mixer for audio playback."""
+    try:
+        pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
+        pygame.mixer.init()
+        pygame.mixer.set_num_channels(8)  # Allow multiple sound effects
+        print("🔊 Audio system initialized")
+    except pygame.error as e:
+        print(f"⚠️  Audio initialization failed: {e}")
+
+def load_background_music() -> None:
+    """Load and start playing background music."""
+    try:
+        music_path = Path("assets/sounds/background_music.wav")
+        if music_path.exists():
+            pygame.mixer.music.load(str(music_path))
+            pygame.mixer.music.set_volume(MUSIC_VOLUME)
+            pygame.mixer.music.play(-1)  # Loop indefinitely
+            print(f"🎵 Background music loaded: {music_path}")
+        else:
+            print(f"⚠️  Background music not found: {music_path}")
+    except pygame.error as e:
+        print(f"⚠️  Failed to load background music: {e}")
+
+def stop_background_music() -> None:
+    """Stop background music playback."""
+    pygame.mixer.music.stop()
+
+def set_music_volume(volume: float) -> None:
+    """Set background music volume (0.0 to 1.0)."""
+    global MUSIC_VOLUME
+    MUSIC_VOLUME = max(0.0, min(1.0, volume))
+    pygame.mixer.music.set_volume(MUSIC_VOLUME)
+
+# Sound effects storage
+sound_effects: dict[str, pygame.mixer.Sound] = {}
+
+def load_sound_effects() -> None:
+    """Load all sound effects."""
+    global sound_effects
+    sounds_dir = Path("assets/sounds")
+
+    sound_files = {
+        "gunshot": "gunshot.wav",
+        "empty_click": "empty_click.wav",
+        "bullet_impact": "bullet_impact.wav",
+        "enemy_death": "enemy_death.wav",
+        "ammo_pickup": "ammo_pickup.wav",
+        "footstep": "footstep.wav",
+        "wave_start": "wave_start.wav",
+        "wave_complete": "wave_complete.wav",
+    }
+
+    for sound_name, filename in sound_files.items():
+        sound_path = sounds_dir / filename
+        try:
+            if sound_path.exists():
+                sound_effects[sound_name] = pygame.mixer.Sound(str(sound_path))
+                sound_effects[sound_name].set_volume(SOUND_VOLUME)
+                print(f"🔊 Loaded sound: {sound_name}")
+            else:
+                print(f"⚠️  Sound file not found: {sound_path}")
+        except pygame.error as e:
+            print(f"⚠️  Failed to load sound {sound_name}: {e}")
+
+def play_sound(sound_name: str, volume_multiplier: float = 1.0) -> None:
+    """Play a sound effect."""
+    if sound_name in sound_effects:
+        try:
+            sound = sound_effects[sound_name]
+            sound.set_volume(SOUND_VOLUME * volume_multiplier)
+            sound.play()
+        except pygame.error as e:
+            print(f"⚠️  Failed to play sound {sound_name}: {e}")
+
+def set_sound_volume(volume: float) -> None:
+    """Set sound effects volume (0.0 to 1.0)."""
+    global SOUND_VOLUME
+    SOUND_VOLUME = max(0.0, min(1.0, volume))
+    for sound in sound_effects.values():
+        sound.set_volume(SOUND_VOLUME)
 
 # Kart (0=tomt, >0=veggtype/tekstur-id)
 MAP: list[list[int]] = [
@@ -1324,6 +1411,12 @@ def find_random_valid_position() -> tuple[float, float]:
 def main() -> None:
     global player_ammo
     pygame.init()
+
+    # Initialize audio system
+    init_audio()
+    load_sound_effects()
+    load_background_music()
+
     pygame.display.set_caption("Vibe Wolf (OpenGL)")
 
     # setup to make it work on mac as well...
@@ -1387,8 +1480,11 @@ def main() -> None:
                         recoil_t = 0.0
                         # Decrease ammo when shooting
                         player_ammo -= 1
-                    # If no ammo, the player can't shoot (silent failure)
-                    # Could add sound effect or visual feedback here
+                        # Play gunshot sound
+                        play_sound("gunshot")
+                    else:
+                        # Play empty click sound when out of ammo
+                        play_sound("empty_click")
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 # Only shoot if player has ammo
                 if player_ammo > 0:
@@ -1401,8 +1497,11 @@ def main() -> None:
                     recoil_t = 0.0
                     # Decrease ammo when shooting
                     player_ammo -= 1
-                # If no ammo, the player can't shoot (silent failure)
-                # Could add sound effect or visual feedback here
+                    # Play gunshot sound
+                    play_sound("gunshot")
+                else:
+                    # Play empty click sound when out of ammo
+                    play_sound("empty_click")
 
         handle_input(dt)
 

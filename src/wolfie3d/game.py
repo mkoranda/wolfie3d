@@ -26,6 +26,7 @@ from __future__ import annotations
 import math
 import random
 import sys
+import time
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -128,13 +129,15 @@ class Bullet:
 
 # ---------- Fiende ----------
 class Enemy:
-    def __init__(self, x: float, y: float) -> None:
+    def __init__(self, x: float, y: float, health: int = 1, speed_multiplier: float = 1.0) -> None:
         self.x = x
         self.y = y
         self.alive = True
         self.radius = 0.35     # kollisjon/hitbox i kart-enheter
-        self.speed = 1.4       # enheter/sek (enkel jakt)
+        self.base_speed = 1.4  # base speed value
+        self.speed = self.base_speed * speed_multiplier  # enheter/sek (enkel jakt)
         self.height_param = 0.5  # hvor høyt sprite sentreres i skjerm
+        self.health = health   # number of hits the enemy can take
 
     def _try_move(self, nx: float, ny: float) -> None:
         # enkel vegg-kollisjon (sirkulær hitbox mot grid)
@@ -144,6 +147,17 @@ class Enemy:
         # prøv Y:
         if not is_wall(int(self.x), int(ny)):
             self.y = ny
+
+    def take_damage(self, amount: int = 1) -> bool:
+        """
+        Reduce enemy health by the given amount.
+        Returns True if the enemy died from this damage, False otherwise.
+        """
+        self.health -= amount
+        if self.health <= 0:
+            self.alive = False
+            return True
+        return False
 
     def update(self, dt: float) -> None:
         if not self.alive:
@@ -157,6 +171,88 @@ class Enemy:
             ux, uy = dx / dist, dy / dist
             step = self.speed * dt
             self._try_move(self.x + ux * step, self.y + uy * step)
+
+
+# ---------- Wave Manager ----------
+class WaveManager:
+    def __init__(self) -> None:
+        self.current_wave = 0
+        self.enemies_spawned = 0
+        self.wave_in_progress = False
+        self.between_waves = False
+        self.wave_start_time = 0.0
+        self.wave_countdown = 0.0
+        self.countdown_duration = 5.0  # seconds between waves
+
+    def start_next_wave(self) -> None:
+        """Start the next wave and reset wave state"""
+        self.current_wave += 1
+        self.enemies_spawned = 0
+        self.wave_in_progress = True
+        self.between_waves = False
+        self.wave_start_time = time.time()
+        print(f"Wave {self.current_wave} started!")
+
+    def start_countdown(self) -> None:
+        """Start countdown to next wave"""
+        self.between_waves = True
+        self.wave_in_progress = False
+        self.wave_countdown = self.countdown_duration
+        print(f"Next wave in {self.countdown_duration} seconds...")
+
+    def update(self, dt: float, enemies: list[Enemy]) -> None:
+        """Update wave state based on time and enemies"""
+        # If between waves, update countdown
+        if self.between_waves:
+            self.wave_countdown -= dt
+            if self.wave_countdown <= 0:
+                self.start_next_wave()
+
+        # If no wave in progress and not between waves, start first wave
+        if not self.wave_in_progress and not self.between_waves:
+            self.start_next_wave()
+
+        # Check if all enemies are dead to end the wave
+        if self.wave_in_progress and self.enemies_spawned > 0:
+            alive_enemies = sum(1 for e in enemies if e.alive)
+            if alive_enemies == 0:
+                self.start_countdown()
+
+    def get_enemies_for_wave(self) -> int:
+        """Calculate how many enemies should be in the current wave"""
+        # Base number of enemies plus additional enemies per wave
+        return 3 + (self.current_wave - 1) * 2
+
+    def get_enemy_health(self) -> int:
+        """Calculate enemy health based on wave number"""
+        # Increase health every 3 waves
+        return 1 + (self.current_wave - 1) // 3
+
+    def get_enemy_speed_multiplier(self) -> float:
+        """Calculate enemy speed multiplier based on wave number"""
+        # Gradually increase speed up to 2x
+        return 1.0 + min(1.0, (self.current_wave - 1) * 0.1)
+
+    def spawn_enemies(self, enemies: list[Enemy]) -> None:
+        """Spawn enemies for the current wave"""
+        if not self.wave_in_progress:
+            return
+
+        enemies_to_spawn = self.get_enemies_for_wave() - self.enemies_spawned
+        if enemies_to_spawn <= 0:
+            return
+
+        health = self.get_enemy_health()
+        speed_mult = self.get_enemy_speed_multiplier()
+
+        for _ in range(enemies_to_spawn):
+            x, y = find_random_valid_position()
+            enemies.append(Enemy(x, y, health=health, speed_multiplier=speed_mult))
+            self.enemies_spawned += 1
+
+    def get_wave_info(self) -> tuple[int, float, bool]:
+        """Return current wave info: wave number, countdown, between_waves flag"""
+        return self.current_wave, self.wave_countdown, self.between_waves
 
 
 # ---------- Ammo Box ----------
@@ -1020,6 +1116,71 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
 
 
+def build_wave_info_display(wave_number: int, countdown: float, between_waves: bool) -> np.ndarray:
+    """Build quads to display wave information in the top-right corner."""
+    verts: list[float] = []
+    pad = 10
+
+    def add_quad_px(x_px, y_px, w_px, h_px, col, depth):
+        r, g, b = col
+        x0 = (2.0 * x_px) / WIDTH - 1.0
+        x1 = (2.0 * (x_px + w_px)) / WIDTH - 1.0
+        y0 = 1.0 - 2.0 * (y_px / HEIGHT)
+        y1 = 1.0 - 2.0 * ((y_px + h_px) / HEIGHT)
+        verts.extend([
+            x0, y0, 0.0, 0.0, r, g, b, depth,
+            x0, y1, 0.0, 1.0, r, g, b, depth,
+            x1, y0, 1.0, 0.0, r, g, b, depth,
+            x1, y0, 1.0, 0.0, r, g, b, depth,
+            x0, y1, 0.0, 1.0, r, g, b, depth,
+            x1, y1, 1.0, 1.0, r, g, b, depth,
+        ])
+
+    # Background panel
+    panel_width = 150
+    panel_height = 60
+    panel_x = WIDTH - panel_width - pad
+    panel_y = pad
+    add_quad_px(panel_x, panel_y, panel_width, panel_height, (0.1, 0.1, 0.1), 0.0)
+
+    # Wave number indicator - display as a series of blocks
+    wave_label_width = 140
+    wave_label_height = 20
+    wave_label_x = panel_x + 5
+    wave_label_y = panel_y + 5
+    add_quad_px(wave_label_x, wave_label_y, wave_label_width, wave_label_height, (0.2, 0.2, 0.2), 0.0)
+
+    # Display wave number as colored blocks
+    block_width = 10
+    block_spacing = 5
+    for i in range(min(wave_number, 10)):  # Limit to 10 blocks
+        block_x = wave_label_x + 5 + i * (block_width + block_spacing)
+        block_y = wave_label_y + 5
+        block_height = 10
+        # Make blocks gradually more red as wave number increases
+        intensity = 0.3 + (i / 10) * 0.7
+        add_quad_px(block_x, block_y, block_width, block_height, (intensity, 0.2, 0.2), 0.0)
+
+    # Countdown bar (only shown between waves)
+    if between_waves:
+        countdown_label_width = 140
+        countdown_label_height = 20
+        countdown_label_x = panel_x + 5
+        countdown_label_y = panel_y + 30
+        add_quad_px(countdown_label_x, countdown_label_y, countdown_label_width, countdown_label_height, (0.2, 0.2, 0.2), 0.0)
+
+        # Progress bar for countdown
+        max_countdown = 5.0  # Same as in WaveManager
+        progress = min(1.0, countdown / max_countdown)
+        bar_width = int(130 * progress)
+        bar_x = countdown_label_x + 5
+        bar_y = countdown_label_y + 5
+        bar_height = 10
+        add_quad_px(bar_x, bar_y, bar_width, bar_height, (0.2, 0.6, 0.2), 0.0)
+
+    return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
+
+
 def build_minimap_quads(ammo_boxes: list['AmmoBox'] = None, enemies: list['Enemy'] = None) -> np.ndarray:
     """Liten GL-basert minimap øverst til venstre."""
     scale = 6
@@ -1181,11 +1342,11 @@ def main() -> None:
     firing = False
     recoil_t = 0.0
 
-    enemies: list[Enemy] = [
-        Enemy(6.5, 10.5),
-        Enemy(12.5, 12.5),
-        Enemy(16.5, 6.5),
-    ]
+    # Initialize empty enemies list (will be populated by wave manager)
+    enemies: list[Enemy] = []
+
+    # Initialize the wave manager
+    wave_manager = WaveManager()
 
     # Initialize ammo boxes with one at a random position
     ammo_boxes: list[AmmoBox] = []
@@ -1245,6 +1406,12 @@ def main() -> None:
 
         handle_input(dt)
 
+        # Update wave manager
+        wave_manager.update(dt, enemies)
+
+        # Spawn enemies for the current wave
+        wave_manager.spawn_enemies(enemies)
+
         # Oppdater bullets
         for b in bullets:
             b.update(dt)
@@ -1256,7 +1423,10 @@ def main() -> None:
                 dx = e.x - b.x
                 dy = e.y - b.y
                 if dx * dx + dy * dy <= (e.radius * e.radius):
-                    e.alive = False  # fienden "dør"
+                    # Use take_damage method instead of directly killing the enemy
+                    enemy_died = e.take_damage(1)
+                    if enemy_died:
+                        print(f"Enemy killed! Wave: {wave_manager.current_wave}")
                     b.alive = False  # kula forbrukes
                     break
         bullets = [b for b in bullets if b.alive]
@@ -1329,6 +1499,11 @@ def main() -> None:
         # Minimap
         mm = build_minimap_quads(ammo_boxes, enemies)
         renderer.draw_arrays(mm, renderer.white_tex, use_tex=False)
+
+        # Wave information display
+        wave_number, countdown, between_waves = wave_manager.get_wave_info()
+        wave_info = build_wave_info_display(wave_number, countdown, between_waves)
+        renderer.draw_arrays(wave_info, renderer.white_tex, use_tex=False)
 
         pygame.display.flip()
 

@@ -1222,17 +1222,17 @@ def build_minimap_quads(ammo_boxes: list['AmmoBox'] = None, enemies: list['Enemy
                 col = (0.86, 0.86, 0.86)
                 add_quad_px(pad + x*scale, pad + y*scale, scale-1, scale-1, col, 0.0)
 
-    # Spiller
+    # Spiller (green)
     px = int(player_x * scale)
     py = int(player_y * scale)
-    add_quad_px(pad + px - 2, pad + py - 2, 4, 4, (1.0, 0.3, 0.3), 0.0)
+    add_quad_px(pad + px - 2, pad + py - 2, 4, 4, (0.0, 1.0, 0.0), 0.0)
 
     # Retningsstrek (en liten rektangulær "linje")
     fx = int(px + dir_x * 8)
     fy = int(py + dir_y * 8)
     # tegn som tynn boks mellom (px,py) og (fx,fy)
     # for enkelhet: bare en liten boks på enden
-    add_quad_px(pad + fx - 1, pad + fy - 1, 2, 2, (1.0, 0.3, 0.3), 0.0)
+    add_quad_px(pad + fx - 1, pad + fy - 1, 2, 2, (0.0, 1.0, 0.0), 0.0)
 
     # Draw ammo boxes on minimap
     for box in ammo_boxes:
@@ -1240,8 +1240,8 @@ def build_minimap_quads(ammo_boxes: list['AmmoBox'] = None, enemies: list['Enemy
             # Convert ammo box position to minimap coordinates
             box_x = int(box.x * scale)
             box_y = int(box.y * scale)
-            # Draw a green square for each ammo box
-            add_quad_px(pad + box_x - 2, pad + box_y - 2, 4, 4, (0.2, 0.8, 0.2), 0.0)
+            # Draw a blue square for each ammo box
+            add_quad_px(pad + box_x - 2, pad + box_y - 2, 4, 4, (0.0, 0.0, 1.0), 0.0)
 
     # Draw enemies on minimap
     for enemy in enemies:

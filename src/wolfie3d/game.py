@@ -247,6 +247,66 @@ def make_bullet_texture() -> pygame.Surface:
     pygame.draw.circle(surf, (255, 255, 255, 255), (13, 13), 3)
     return surf
 
+def make_ammo_box_texture() -> pygame.Surface:
+    """Create a texture for the ammo box - a military-style ammunition box"""
+    surf = pygame.Surface((64, 64), pygame.SRCALPHA)
+
+    # Draw the main box (olive green/khaki)
+    box_rect = pygame.Rect(4, 4, 56, 56)
+    pygame.draw.rect(surf, (102, 107, 72, 255), box_rect)  # Military olive green
+
+    # Add box texture/pattern
+    for y in range(6, 58, 4):
+        # Horizontal texture lines (slightly darker)
+        pygame.draw.line(surf, (90, 95, 65, 100), (6, y), (58, y))
+
+    # Draw box outline (darker olive)
+    pygame.draw.rect(surf, (80, 85, 55, 255), box_rect, 2)
+
+    # Draw metal clasps/latches
+    clasp_color = (150, 150, 140, 255)  # Metallic color
+    # Left clasp
+    pygame.draw.rect(surf, clasp_color, pygame.Rect(10, 25, 8, 14))
+    pygame.draw.line(surf, (70, 70, 65, 255), (10, 32), (18, 32), 2)
+    # Right clasp
+    pygame.draw.rect(surf, clasp_color, pygame.Rect(46, 25, 8, 14))
+    pygame.draw.line(surf, (70, 70, 65, 255), (46, 32), (54, 32), 2)
+
+    # Draw handle on top
+    handle_color = (60, 65, 45, 255)  # Dark handle color
+    pygame.draw.rect(surf, handle_color, pygame.Rect(24, 8, 16, 6))
+    pygame.draw.rect(surf, clasp_color, pygame.Rect(22, 10, 20, 2))  # Metal part
+
+    # Add text "AMMO" to the box
+    # Since we can't use fonts directly, we'll draw it with lines
+    # A
+    pygame.draw.line(surf, (30, 30, 25, 255), (20, 45), (24, 38), 2)
+    pygame.draw.line(surf, (30, 30, 25, 255), (24, 38), (28, 45), 2)
+    pygame.draw.line(surf, (30, 30, 25, 255), (22, 42), (26, 42), 1)
+    # M
+    pygame.draw.line(surf, (30, 30, 25, 255), (30, 38), (30, 45), 2)
+    pygame.draw.line(surf, (30, 30, 25, 255), (30, 38), (33, 42), 1)
+    pygame.draw.line(surf, (30, 30, 25, 255), (33, 42), (36, 38), 1)
+    pygame.draw.line(surf, (30, 30, 25, 255), (36, 38), (36, 45), 2)
+    # O
+    pygame.draw.circle(surf, (30, 30, 25, 255), (44, 42), 4, 2)
+
+    # Add weathering/scratches
+    for _ in range(5):
+        x = random.randint(8, 56)
+        y = random.randint(8, 56)
+        length = random.randint(3, 8)
+        angle = random.random() * 6.28
+        ex = x + int(math.cos(angle) * length)
+        ey = y + int(math.sin(angle) * length)
+        pygame.draw.line(surf, (120, 125, 90, 100), (x, y), (ex, ey), 1)
+
+    # Add highlight on edges
+    pygame.draw.line(surf, (130, 135, 100, 150), (6, 6), (40, 6), 1)
+    pygame.draw.line(surf, (130, 135, 100, 150), (6, 6), (6, 40), 1)
+
+    return surf
+
 # ---------- OpenGL utils ----------
 VS_SRC = """
 #version 330 core
@@ -500,6 +560,10 @@ class GLRenderer:
         except Exception as ex:
             print(f"[GLRenderer] Enemy: FEIL ved lasting ({ex}), bruker prosedural")
             self.textures[200] = surface_to_texture(make_enemy_texture())
+
+        # Ammo box sprite (ID 201): procedurally generated
+        self.textures[201] = surface_to_texture(make_ammo_box_texture())
+        print(f"[GLRenderer] Ammo box OK (GL tex id {self.textures[201]})")
 
         print("[GLRenderer] Teksturer lastet.\n")
 
@@ -772,6 +836,74 @@ def build_enemies_batch(enemies: list['Enemy']) -> np.ndarray:
         return np.zeros((0, 8), dtype=np.float32)
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
 
+def build_ammo_boxes_batch(ammo_boxes: list['AmmoBox']) -> np.ndarray:
+    """Build rendering batch for ammo boxes, similar to enemies but with different texture"""
+    verts: list[float] = []
+    for box in ammo_boxes:
+        if not box.alive:
+            continue
+
+        # Transform to camera space
+        spr_x = box.x - player_x
+        spr_y = box.y - player_y
+        inv_det = 1.0 / (plane_x * dir_y - dir_x * plane_y + 1e-9)
+        trans_x = inv_det * (dir_y * spr_x - dir_x * spr_y)
+        trans_y = inv_det * (-plane_y * spr_x + plane_x * spr_y)
+        if trans_y <= 0:
+            continue  # behind camera
+
+        # Calculate screen position
+        sprite_screen_x = int((WIDTH / 2) * (1 + trans_x / trans_y))
+        # Make ammo box smaller (50% of original size)
+        sprite_h = abs(int((HEIGHT / trans_y) * 0.5))
+        sprite_w = sprite_h  # square sprite
+
+        # Vertical offset (lower than enemies)
+        v_shift = int((0.5 - box.height_param) * sprite_h)
+
+        # Calculate screen coordinates
+        draw_start_y = max(0, -sprite_h // 2 + HALF_H + v_shift)
+        draw_end_y   = min(HEIGHT - 1, draw_start_y + sprite_h)
+        draw_start_x = -sprite_w // 2 + sprite_screen_x
+        draw_end_x   = draw_start_x + sprite_w
+
+        # Clip if outside screen
+        if draw_end_x < 0 or draw_start_x >= WIDTH:
+            continue
+
+        draw_start_x = max(0, draw_start_x)
+        draw_end_x   = min(WIDTH - 1, draw_end_x)
+
+        # Convert to NDC
+        x0 = (2.0 * draw_start_x) / WIDTH - 1.0
+        x1 = (2.0 * (draw_end_x + 1)) / WIDTH - 1.0
+        y0 = 1.0 - 2.0 * (draw_start_y / HEIGHT)
+        y1 = 1.0 - 2.0 * (draw_end_y   / HEIGHT)
+
+        # Depth based on distance
+        depth = clamp01(trans_y / FAR_PLANE)
+
+        # No color tint
+        r = g = b = 1.0
+
+        # Texture coordinates (no flip needed)
+        u0, v0, u1, v1 = 0.0, 0.0, 1.0, 1.0
+
+        # Add vertices for the quad
+        verts.extend([
+            x0, y0, u0, v0, r, g, b, depth,
+            x0, y1, u0, v1, r, g, b, depth,
+            x1, y0, u1, v0, r, g, b, depth,
+
+            x1, y0, u1, v0, r, g, b, depth,
+            x0, y1, u0, v1, r, g, b, depth,
+            x1, y1, u1, v1, r, g, b, depth,
+        ])
+
+    if not verts:
+        return np.zeros((0, 8), dtype=np.float32)
+    return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
+
 
 def build_crosshair_quads(size_px: int = 8, thickness_px: int = 2) -> np.ndarray:
     """To små rektangler (horisontalt/vertikalt), sentrert i skjermen."""
@@ -888,13 +1020,17 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
 
 
-def build_minimap_quads() -> np.ndarray:
+def build_minimap_quads(ammo_boxes: list['AmmoBox'] = None) -> np.ndarray:
     """Liten GL-basert minimap øverst til venstre."""
     scale = 6
     mm_w = MAP_W * scale
     mm_h = MAP_H * scale
     pad = 10
     verts: list[float] = []
+
+    # If ammo_boxes is None, use an empty list
+    if ammo_boxes is None:
+        ammo_boxes = []
 
     def add_quad_px(x_px, y_px, w_px, h_px, col, depth):
         r, g, b = col
@@ -932,6 +1068,15 @@ def build_minimap_quads() -> np.ndarray:
     # tegn som tynn boks mellom (px,py) og (fx,fy)
     # for enkelhet: bare en liten boks på enden
     add_quad_px(pad + fx - 1, pad + fy - 1, 2, 2, (1.0, 0.3, 0.3), 0.0)
+
+    # Draw ammo boxes on minimap
+    for box in ammo_boxes:
+        if box.alive:
+            # Convert ammo box position to minimap coordinates
+            box_x = int(box.x * scale)
+            box_y = int(box.y * scale)
+            # Draw a green square for each ammo box
+            add_quad_px(pad + box_x - 2, pad + box_y - 2, 4, 4, (0.2, 0.8, 0.2), 0.0)
 
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
 
@@ -984,6 +1129,24 @@ def handle_input(dt: float) -> None:
         player_x, player_y = try_move(nx, ny)
 
 # ---------- Main ----------
+def find_random_valid_position() -> tuple[float, float]:
+    """Find a random valid position on the floor (not inside a wall)"""
+    while True:
+        # Generate random position within map bounds
+        x = random.uniform(1.5, MAP_W - 1.5)
+        y = random.uniform(1.5, MAP_H - 1.5)
+
+        # Check if position is valid (not inside a wall)
+        if not is_wall(int(x), int(y)):
+            # Make sure it's not too close to the player's starting position
+            dx = x - 3.5  # player_x starting position
+            dy = y - 10.5  # player_y starting position
+            dist = math.hypot(dx, dy)
+
+            # If it's at least 3 units away from player start, it's valid
+            if dist > 3.0:
+                return x, y
+
 def main() -> None:
     global player_ammo
     pygame.init()
@@ -1010,6 +1173,15 @@ def main() -> None:
         Enemy(12.5, 12.5),
         Enemy(16.5, 6.5),
     ]
+
+    # Initialize ammo boxes with one at a random position
+    ammo_boxes: list[AmmoBox] = []
+    x, y = find_random_valid_position()
+    ammo_boxes.append(AmmoBox(x, y))
+
+    # Timer for spawning new ammo boxes
+    ammo_box_spawn_timer = 0.0
+    ammo_box_spawn_interval = 20.0  # seconds between spawns
 
     # Mus-capture (synlig cursor + crosshair)
     pygame.event.set_grab(True)
@@ -1080,6 +1252,21 @@ def main() -> None:
         for e in enemies:
             e.update(dt)
 
+        # Update ammo boxes
+        for box in ammo_boxes:
+            box.update(dt)
+
+        # Clean up picked up ammo boxes
+        ammo_boxes = [box for box in ammo_boxes if box.alive]
+
+        # Spawn new ammo box if needed
+        ammo_box_spawn_timer += dt
+        if ammo_box_spawn_timer >= ammo_box_spawn_interval and len(ammo_boxes) < 3:
+            x, y = find_random_valid_position()
+            ammo_boxes.append(AmmoBox(x, y))
+            ammo_box_spawn_timer = 0.0
+            print(f"New ammo box spawned at ({x:.1f}, {y:.1f})")
+
         # ---------- Render ----------
         gl.glViewport(0, 0, WIDTH, HEIGHT)
         gl.glClearColor(0.05, 0.07, 0.1, 1.0)
@@ -1109,6 +1296,11 @@ def main() -> None:
         if enemies_batch.size:
             renderer.draw_arrays(enemies_batch, renderer.textures[200], use_tex=True)
 
+        # Ammo boxes (billboards)
+        ammo_boxes_batch = build_ammo_boxes_batch(ammo_boxes)
+        if ammo_boxes_batch.size:
+            renderer.draw_arrays(ammo_boxes_batch, renderer.textures[201], use_tex=True)
+
         # Crosshair
         cross = build_crosshair_quads(8, 2)
         renderer.draw_arrays(cross, renderer.white_tex, use_tex=False)
@@ -1122,7 +1314,7 @@ def main() -> None:
         renderer.draw_arrays(overlay, renderer.white_tex, use_tex=False)
 
         # Minimap
-        mm = build_minimap_quads()
+        mm = build_minimap_quads(ammo_boxes)
         renderer.draw_arrays(mm, renderer.white_tex, use_tex=False)
 
         pygame.display.flip()

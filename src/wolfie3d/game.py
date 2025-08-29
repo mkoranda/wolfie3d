@@ -792,6 +792,31 @@ class GLRenderer:
         self.textures[201] = surface_to_texture(make_ammo_box_texture())
         print(f"[GLRenderer] Ammo box OK (GL tex id {self.textures[201]})")
 
+        # Weapon sprites (ID 202: pistol, ID 203: rifle)
+        try:
+            sprites_dir = self._resolve_textures_base().parent / "sprites"
+            pistol_path = sprites_dir / "pistol.png"
+            rifle_path = sprites_dir / "rifle.png"
+
+            print(f"[GLRenderer] Leter etter weapon sprites i: {sprites_dir}")
+            if pistol_path.exists():
+                self.textures[202] = self._load_texture_file(pistol_path, 512)
+                print(f"[GLRenderer] Pistol OK (GL tex id {self.textures[202]})")
+            else:
+                print("[GLRenderer] Pistol sprite ikke funnet, bruker fallback")
+                self.textures[202] = self.white_tex
+
+            if rifle_path.exists():
+                self.textures[203] = self._load_texture_file(rifle_path, 512)
+                print(f"[GLRenderer] Rifle OK (GL tex id {self.textures[203]})")
+            else:
+                print("[GLRenderer] Rifle sprite ikke funnet, bruker fallback")
+                self.textures[203] = self.white_tex
+        except Exception as ex:
+            print(f"[GLRenderer] Weapon sprites: FEIL ved lasting ({ex}), bruker fallback")
+            self.textures[202] = self.white_tex
+            self.textures[203] = self.white_tex
+
         print("[GLRenderer] Teksturer lastet.\n")
 
     # ---------- draw ----------
@@ -1172,11 +1197,11 @@ def build_crosshair_quads(size_px: int = 8, thickness_px: int = 2) -> np.ndarray
 
     return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
 
-def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
-    """Weapon display with current weapon color and recoil animation."""
+def build_weapon_overlay(firing: bool, recoil_t: float) -> tuple[np.ndarray, int]:
+    """Weapon display with current weapon texture and recoil animation."""
     verts = []
 
-    # Weapon box - use current weapon color
+    # Weapon box - use current weapon texture
     base_w, base_h = 200, 120
     x = HALF_W - base_w // 2
     y = HEIGHT - base_h - 10
@@ -1188,8 +1213,8 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
     y0 = 1.0 - 2.0 * (y / HEIGHT)
     y1 = 1.0 - 2.0 * ((y + base_h) / HEIGHT)
 
-    # Use current weapon color
-    r, g, b = current_weapon.color
+    # Use white color for texture rendering (texture provides the color)
+    r, g, b = 1.0, 1.0, 1.0
     depth = 0.0
     verts.extend([
         x0, y0, 0.0, 0.0, r, g, b, depth,
@@ -1200,6 +1225,9 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
         x0, y1, 0.0, 1.0, r, g, b, depth,
         x1, y1, 1.0, 1.0, r, g, b, depth,
     ])
+
+    # Determine weapon texture ID based on current weapon
+    weapon_texture_id = 202 if current_weapon_id == 1 else 203  # 202=pistol, 203=rifle
 
     # Ammo counter - a full bar that changes color and shrinks as ammo depletes
     # Uses current weapon's ammo and max ammo for proper scaling
@@ -1241,7 +1269,7 @@ def build_weapon_overlay(firing: bool, recoil_t: float) -> np.ndarray:
         ax1, ay1, 1.0, 1.0, ar, ag, ab, depth,
     ])
 
-    return np.asarray(verts, dtype=np.float32).reshape((-1, 8))
+    return np.asarray(verts, dtype=np.float32).reshape((-1, 8)), weapon_texture_id
 
 
 def build_wave_info_display(wave_number: int, countdown: float, between_waves: bool) -> np.ndarray:
@@ -1645,8 +1673,9 @@ def main() -> None:
             recoil_t += dt
             if recoil_t > 0.15:
                 firing = False
-        overlay = build_weapon_overlay(firing, recoil_t)
-        renderer.draw_arrays(overlay, renderer.white_tex, use_tex=False)
+        overlay, weapon_texture_id = build_weapon_overlay(firing, recoil_t)
+        weapon_texture = renderer.textures.get(weapon_texture_id, renderer.white_tex)
+        renderer.draw_arrays(overlay, weapon_texture, use_tex=True)
 
         # Minimap
         mm = build_minimap_quads(ammo_boxes, enemies)

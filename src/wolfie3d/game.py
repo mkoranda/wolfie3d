@@ -368,6 +368,8 @@ class AmmoBox:
             player_ammo = 20  # Reload ammo to 100% (20 bullets)
             self.alive = False
             print("Ammo reloaded to 100%!")
+            # Play ammo pickup sound
+            play_sound("ammo_pickup")
 
 
 # ---------- Prosedural tekstur (pygame.Surface) ----------

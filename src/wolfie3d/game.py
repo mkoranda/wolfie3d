@@ -1526,6 +1526,11 @@ def main() -> None:
                     enemy_died = e.take_damage(1)
                     if enemy_died:
                         print(f"Enemy killed! Wave: {wave_manager.current_wave}")
+                        # Play enemy death sound
+                        play_sound("enemy_death")
+                    else:
+                        # Play bullet impact sound when hitting enemy but not killing
+                        play_sound("bullet_impact")
                     b.alive = False  # kula forbrukes
                     break
         bullets = [b for b in bullets if b.alive]

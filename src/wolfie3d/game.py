@@ -24,6 +24,7 @@ Taster:
 from __future__ import annotations
 
 import math
+import random
 import sys
 from typing import TYPE_CHECKING
 
@@ -156,6 +157,34 @@ class Enemy:
             ux, uy = dx / dist, dy / dist
             step = self.speed * dt
             self._try_move(self.x + ux * step, self.y + uy * step)
+
+
+# ---------- Ammo Box ----------
+class AmmoBox:
+    def __init__(self, x: float, y: float) -> None:
+        self.x = x
+        self.y = y
+        self.alive = True
+        self.radius = 0.35     # kollisjon/hitbox i kart-enheter
+        self.height_param = 0.3  # hvor høyt sprite sentreres i skjerm (lower than enemies)
+        self.pickup_distance = 0.8  # distance at which player can pick up the ammo box
+
+    def update(self, dt: float) -> None:
+        """Check if player is close enough to pick up the ammo box"""
+        if not self.alive:
+            return
+
+        # Calculate distance to player
+        dx = player_x - self.x
+        dy = player_y - self.y
+        dist = math.hypot(dx, dy)
+
+        # If player is close enough, reload ammo and mark as not alive
+        if dist <= self.pickup_distance:
+            global player_ammo
+            player_ammo = 20  # Reload ammo to 100% (20 bullets)
+            self.alive = False
+            print("Ammo reloaded to 100%!")
 
 
 # ---------- Prosedural tekstur (pygame.Surface) ----------

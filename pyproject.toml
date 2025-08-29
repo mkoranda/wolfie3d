@@ -1,0 +1,100 @@
+[project]
+name = "wolfie3d"
+version = "0.1.0"
+description = "Pygame 3D Shooter — project scaffolding and tooling"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Your Name", email = "you@example.com" },
+]
+license = { text = "MIT" }
+keywords = ["pygame", "3D", "shooter", "game"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Games/Entertainment",
+]
+
+# Minimal runtime deps for an empty scaffold. Actual game deps can be expanded later.
+dependencies = [
+  "pygame>=2.6.0",
+  "numpy>=1.26",
+  "pyopengl>=3.1.10",
+]
+
+
+# Optional: add a console entry point for your game
+[project.scripts]
+wolfie3d = "wolfie3d.game:main"
+
+[project.urls]
+Homepage = "https://example.com/wolfie3d"
+Repository = "https://example.com/wolfie3d/repo"
+Issues = "https://example.com/wolfie3d/issues"
+
+[build-system]
+# uv will generate and use its own build backend; specify default for fallback
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# Tooling configuration
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+  "E", "F",      # pycodestyle + pyflakes
+  "I",            # import sorting
+  "UP",           # pyupgrade
+  "B",            # flake8-bugbear
+  "C90",          # mccabe complexity
+]
+ignore = [
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["wolfie3d"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+mypy_path = ["src"]
+
+# foo
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "mypy>=1.17.1",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.10"
+]
+
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.12" }

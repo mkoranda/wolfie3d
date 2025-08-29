@@ -279,6 +279,8 @@ class WaveManager:
         self.between_waves = False
         self.wave_start_time = time.time()
         print(f"Wave {self.current_wave} started!")
+        # Play wave start sound
+        play_sound("wave_start")
 
     def start_countdown(self) -> None:
         """Start countdown to next wave"""
@@ -286,6 +288,8 @@ class WaveManager:
         self.wave_in_progress = False
         self.wave_countdown = self.countdown_duration
         print(f"Next wave in {self.countdown_duration} seconds...")
+        # Play wave complete sound
+        play_sound("wave_complete")
 
     def update(self, dt: float, enemies: list[Enemy]) -> None:
         """Update wave state based on time and enemies"""
